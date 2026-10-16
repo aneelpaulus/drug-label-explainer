@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drug Label Explainer</title>
+<meta name="description" content="Type the name of a prescription drug and get its official FDA label in plain English: what it's approved for, what the main studies found, what it says about age, and common side effects.">
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #fcfcfb; --text: #1c1c1e; --muted: #52514e; --line: #e1e1dc;
+    --accent: #1d5c86; --accent-text: #ffffff; --soft: #e4eef6;
+    --warn: #7d5300; --warnbg: #fcf0d6;
+    --bad: #9e2428; --badbg: #fae5e5;
+    --ok: #1d6f42; --okbg: #e5f3eb;
+    --mark: #fff1b8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121314; --card: #1a1a19; --text: #f0efec; --muted: #c3c2b7; --line: #34342f;
+      --accent: #5aa3d6; --accent-text: #0b1620; --soft: #172a39;
+      --warn: #f0c46b; --warnbg: #3a2e14;
+      --bad: #f09a9d; --badbg: #3d1d1f;
+      --ok: #7fd3a3; --okbg: #183225;
+      --mark: #4a3f12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 56px; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h2 { font-size: 1.25rem; margin: 34px 0 10px; }
+  h3 { font-size: 1.05rem; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  label { font-weight: 600; display: block; margin-bottom: 6px; }
+  input[type=text], input[type=number], input[type=password] { font: inherit; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; }
+  .grid2 { display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end; }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  button { font: inherit; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.small { padding: 5px 11px; font-size: 0.88rem; border-radius: 999px; }
+  button.link { border: none; background: none; color: var(--accent); padding: 2px 0; text-decoration: underline; font-size: 0.92rem; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .hint { color: var(--muted); font-size: 0.88rem; }
+  .status { color: var(--muted); font-size: 0.92rem; min-height: 1.4em; margin-top: 8px; }
+  .status.err { color: var(--bad); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 10px 0; }
+  .callout { border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+  .callout.warn { background: var(--warnbg); color: var(--warn); }
+  .callout.bad { background: var(--badbg); color: var(--bad); }
+  .callout.info { background: var(--soft); }
+  .drugname { font-size: 1.5rem; font-weight: 700; margin: 0; }
+  .facts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 12px; }
+  .fact .k { color: var(--muted); font-size: 0.82rem; }
+  .fact .v { font-weight: 600; }
+  ul.clean { margin: 6px 0; padding-left: 20px; }
+  ul.clean li { margin: 4px 0; }
+  .study h3 { display: flex; justify-content: space-between; gap: 10px; }
+  .tag { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--soft); color: var(--accent); margin: 2px 4px 2px 0; }
+  .result { padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .result:last-child { border-bottom: none; }
+  .plain { color: var(--ok); background: var(--okbg); border-radius: 8px; padding: 6px 10px; margin-top: 6px; font-size: 0.9rem; }
+  .term { border-bottom: 1px dotted var(--muted); cursor: help; }
+  mark { background: var(--mark); color: inherit; padding: 0 2px; border-radius: 3px; }
+  .full { white-space: pre-wrap; font-size: 0.9rem; color: var(--muted); max-height: 420px; overflow-y: auto; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+  .tablewrap { overflow-x: auto; margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; }
+  .tablewrap table { border-collapse: collapse; font-size: 0.82rem; min-width: 100%; }
+  .tablewrap td, .tablewrap th { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+  .tablewrap caption { text-align: left; font-weight: 600; padding: 8px; font-size: 0.85rem; }
+  details > summary { cursor: pointer; color: var(--accent); font-size: 0.92rem; margin-top: 8px; }
+  .gloss dt { font-weight: 700; margin-top: 10px; }
+  .gloss dd { margin: 2px 0 0; color: var(--muted); }
+  .tip { position: fixed; pointer-events: none; max-width: 320px; background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 8px; font-size: 0.85rem; display: none; z-index: 10; }
+  .aiout { white-space: pre-wrap; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 0.84rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Drug Label Explainer</h1>
+  <p class="lede">Saw a drug in a TV ad, or heard its name from a doctor? Type it below to read its official FDA label in plain English: what it's approved for, what the main studies found, what the label says about age, and the most common side effects.</p>
+
+  <div class="grid2">
+    <div>
+      <label for="q">Drug name (brand or generic)</label>
+      <input type="text" id="q" placeholder="e.g. Keytruda, Ozempic, Kisqali" autocomplete="off">
+    </div>
+    <div>
+      <label for="age">Age (optional)</label>
+      <input type="number" id="age" min="0" max="120" placeholder="e.g. 72">
+    </div>
+  </div>
+  <div class="row">
+    <button class="primary" id="go">Look it up</button>
+    <span class="hint">Try:</span>
+    <button class="small ex">Keytruda</button><button class="small ex">Ozempic</button><button class="small ex">Kisqali</button><button class="small ex">Darzalex</button><button class="small ex">Rinvoq</button>
+  </div>
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <section id="out" hidden>
+    <div class="row" id="versions"></div>
+
+    <div class="card">
+      <p class="drugname" id="dName"></p>
+      <div class="hint" id="dGeneric"></div>
+      <div class="facts" id="facts"></div>
+    </div>
+    <div id="boxed"></div>
+
+    <h2>What it's approved for</h2>
+    <div id="indications"></div>
+
+    <h2>What the main studies found</h2>
+    <p class="hint">These are the studies the FDA reviewed before approving the drug, as summarized in its label. Key results are pulled out automatically. Tap a dotted term for a definition, or open the full text to read every detail.</p>
+    <div class="row" id="studyFilterRow">
+      <input type="text" id="studyFilter" placeholder="Show only studies about... (e.g. lung, breast, diabetes)" style="flex:1;min-width:200px">
+    </div>
+    <div id="studies"></div>
+
+    <h2 id="ageTitle">What the label says about age</h2>
+    <div id="agePanel"></div>
+
+    <h2>Most common side effects</h2>
+    <div id="sideEffects"></div>
+
+    <h2>Get a plain-language summary from AI</h2>
+    <div class="card">
+      <p style="margin-top:0">Download a ready-made report, then upload it to (or paste it into) the AI assistant you already use, such as ChatGPT, Claude, Gemini, or Copilot. The report contains the label text and instructions asking the AI to explain it simply and stick to what the label says.</p>
+      <div class="row">
+        <button class="primary" id="dl">Download report for AI</button>
+        <button id="copy">Copy report</button>
+      </div>
+      <p class="hint" id="reportNote"></p>
+      <details>
+        <summary>Have your own Claude API key? Get the summary right here</summary>
+        <p class="hint">Your key is sent only to Anthropic with this request, is not stored, and is cleared when you leave the page. Each summary is billed to your account.</p>
+        <div class="row"><input type="password" id="key" placeholder="sk-ant-..." autocomplete="off" style="flex:1;min-width:200px"></div>
+        <div class="row"><span class="hint">Model</span><input type="text" id="model" value="claude-sonnet-5-5" style="max-width:220px"><button id="ai">Explain in plain English</button></div>
+        <div class="card aiout" id="aiOut" hidden></div>
+      </details>
+    </div>
+
+    <h2>Words you'll see</h2>
+    <dl class="card gloss" id="glossary"></dl>
+  </section>
+
+  <footer>
+    <p><strong>This is not medical advice.</strong> It shows what the FDA label says, which describes results for groups of people in studies, not what will happen for any one person. Only a doctor who knows the person's full situation can say whether a drug is a good choice. Bring your questions to them.</p>
+    <p><strong>Where the information comes from.</strong> Drug labels come from the FDA through openFDA, the FDA's free public data service. First approval dates come from Drugs@FDA. Key results are pulled out of the label text automatically and can occasionally miss or misplace a number, so check the full text for anything important.</p>
+    <p><strong>Privacy.</strong> Your search goes only to openFDA. If you use the AI button, the label text and your key go only to Anthropic. Nothing is stored. Not affiliated with the FDA.</p>
+    <p>Open source under the MIT License. Built by Aneel Paulus, MD, MS.</p>
+  </footer>
+</main>
+<div class="tip" id="tip"></div>
+
+<script>
+/* ---------- Pure helpers (no network, testable) ---------- */
+const GLOSSARY = [
+  ["Overall survival (OS)", /\boverall survival\b|\bOS\b/, "How long people lived after starting treatment, from any cause. Often the most important measure for cancer drugs."],
+  ["Progression-free survival (PFS)", /progression[- ]free survival|\bPFS\b/, "How long people lived without the disease getting worse (growing or spreading)."],
+  ["Event-free / disease-free survival", /event[- ]free survival|disease[- ]free survival|\bEFS\b|\bDFS\b|invasive disease[- ]free survival|\bIDFS\b/, "How long people stayed free of the cancer coming back, getting worse, or other set events, usually after surgery."],
+  ["Response rate (ORR)", /(?:overall|objective) response rate|\bORR\b|response rate/, "The share of people whose disease shrank by a set amount on scans or tests. Higher is better, but shrinking is not the same as living longer."],
+  ["Complete response (CR)", /complete response|\bCR\b/, "No detectable disease left on the tests used in the study. It does not always mean cured."],
+  ["Duration of response (DOR)", /duration of response|\bDOR\b/, "For people whose disease shrank, how long that improvement lasted."],
+  ["Median", /\bmedian\b/, "The middle value: half the people had a result above it and half below. A median survival of 2 years means half lived longer than 2 years."],
+  ["Hazard ratio (HR)", /hazard ratio|\bHR\b/, "Compares the risk of a bad event (such as death or the disease worsening) between two groups over time. Below 1 favors the new drug: 0.70 means about 30% lower risk at any point in time."],
+  ["Confidence interval (CI)", /confidence interval|\bCI\b/, "The range where the true result most likely sits. A narrow range means more certainty. For a hazard ratio, a range entirely below 1 suggests a real benefit."],
+  ["p-value", /p[ -]?value|\bp\s?[<=]/i, "A measure of how likely the result is due to chance. Smaller is stronger evidence; below 0.05 is the usual cutoff."],
+  ["Placebo", /placebo/, "An inactive look-alike treatment, used so the study can tell what the real drug adds."],
+  ["Randomized", /randomi[sz]ed/, "People were assigned to treatment groups by chance, which makes the comparison fair."],
+  ["Open-label / double-blind", /open[- ]label|double[- ]blind/, "Open-label: everyone knew which treatment they got. Double-blind: neither patients nor doctors knew, which reduces bias."],
+  ["HbA1c (A1C)", /HbA1c|\bA1C\b/i, "A blood test showing average blood sugar over the past 2 to 3 months. For diabetes drugs, a bigger drop means better sugar control."],
+  ["MACE", /\bMACE\b/, "Major adverse cardiovascular events: heart attack, stroke, or death from heart or blood vessel disease, counted together."],
+  ["Adverse reaction", /adverse reaction/, "A side effect or unwanted effect seen in people taking the drug."]
+];
+
+const ENDPOINT = /overall survival|progression[- ]free|event[- ]free|disease[- ]free|response rate|duration of response|complete response|hazard ratio|\bHR\b|\bORR\b|\bPFS\b|\bOS\b|\bEFS\b|\bDOR\b|HbA1c|\bA1C\b|body weight|weight loss|\bMACE\b|PASI|ACR\s?20|ACR\s?50|EASI|\bIGA\b|remission|relapse|exacerbation|reduction in|reduced the risk|mortality|death/i;
+const SALT_TAIL = /\s+(and hyaluronidase.*|and berahyaluronidase.*)$/i;
+
+function clean(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
+
+// Split a label section on its numbered subsections (e.g. "14.1 Melanoma ...", "1.2 Lung Cancer ...").
+function splitNumbered(text, major) {
+  const t = clean(text).replace(/^\d+\s+(INDICATIONS\s*(AND|&)\s*USAGE|CLINICAL STUDIES)\s*/i, "").replace(/^(INDICATIONS\s*(AND|&)\s*USAGE|CLINICAL STUDIES)\s*/i, "");
+  const re = new RegExp("(?:^|\\s)(" + major + "\\.\\d+)\\s+(?=[A-Z])", "g");
+  const marks = [...t.matchAll(re)].map(m => ({ num: m[1], at: m.index + (m[0].startsWith(" ") ? 1 : 0) }));
+  if (!marks.length) return [{ num: "", title: "", body: t }];
+  const out = [];
+  if (marks[0].at > 40) out.push({ num: "", title: "", body: t.slice(0, marks[0].at).trim() });
+  marks.forEach((m, i) => {
+    const chunk = t.slice(m.at + m.num.length, i + 1 < marks.length ? marks[i + 1].at : t.length).trim();
+    const title = sectionTitle(chunk);
+    out.push({ num: m.num, title, body: chunk.slice(title.length).trim() || chunk });
+  });
+  return out;
+}
+
+// A subsection title ends where its first sentence begins (a brand name in capitals, "The", "In", a trial name and colon...).
+function sectionTitle(chunk) {
+  const stop = /\s(?=[A-Z]{4,}[®™]?[\s,:]|[A-Z][A-Z0-9-]{2,}[®™]?(?::|\s+(?:is|was|were|in|as|and|\(|,|®))|The\s|This\s|In\s|A\s|An\s|Patients\s|Efficacy\s|Treatment\s|Monotherapy\s|[A-Z][a-z]+\s(?:is|was|were|has|have)\s)/g;
+  let end = -1, m;
+  while ((m = stop.exec(chunk))) { if (m.index >= 3) { end = m.index; break; } }
+  let title = (end > 0 ? chunk.slice(0, end) : chunk.slice(0, 70)).trim();
+  if (title.length > 80) title = title.slice(0, 80).replace(/\s\S*$/, "");
+  return title.replace(/\s+(of|in|with|and|for|the|to)$/i, "");
+}
+
+// Turn an indication paragraph into short items ("in combination with X in newly diagnosed patients..."), without repeats.
+function indicationItems(body) {
+  const t = clean(body).replace(/\(\s*\d+(\.\d+)*[^)]{0,20}\)/g, "").replace(/\[\s*see[^\]]*\]/gi, "");
+  const parts = t.split(/(?<=[.:;])\s+(?=(?:in combination|as (?:a )?(?:monotherapy|single agent)|for the|in (?:adult|patients|pediatric)|as (?:first|adjuvant|neoadjuvant|maintenance)|to (?:reduce|improve|treat)|[A-Z][A-Za-z]+ is indicated|[A-Z]{3,}[®™]? is (?:a|an|indicated)|[A-Z][a-z]+(?: [A-Za-z-]+){0,5} (?:Cancer|Carcinoma|Lymphoma|Leukemia|Myeloma|Melanoma|Disease|Arthritis|Psoriasis|Diabetes)\b))/);
+  const seen = new Set(), out = [];
+  for (let p of parts) {
+    p = p.trim().replace(/:$/, "."); if (p.length < 12) continue;
+    const k = p.toLowerCase().replace(/[^a-z]/g, "").slice(0, 90);
+    if (seen.has(k)) continue; seen.add(k);
+    const lead = /is (?:an? [^.]{0,70})?indicated for the treatment of/i.test(p);
+    if (lead && out.some(o => /is (?:an? [^.]{0,70})?indicated for the treatment of/i.test(o))) continue;
+    out.push(p.charAt(0).toUpperCase() + p.slice(1));
+  }
+  return out;
+}
+
+// The label's own "most common side effects" sentences, one per condition or study at most.
+function commonSideEffects(ar) {
+  const t = clean(ar).replace(/\(\s*\d+(\.\d+)*\s*\)|\[\s*see[^\]]*\]/gi, "");
+  const re = /(?:(?:In|For|Among) [^.;:]{0,90}?,\s*)?(?:the\s+)?(?:most (?:common|frequent(?:ly reported)?)[^.]{0,100}?adverse reactions|[A-Z][A-Za-z’' -]{2,40}?\s*:\s*adverse reactions\s*\(\s*≥\s?\d+\s?%\s*\))[^.]*?(?:\.(?=\s)|\.$)/gi;
+  const seen = new Set(), out = [];
+  for (const m of t.matchAll(re)) {
+    let x = m[0].trim().replace(/^[^A-Za-z]+/, "");
+    if (/serious|required|discontinuation|dose reduction|interruption|cancellation|leading to|led to/i.test(x)) continue;
+    x = x.charAt(0).toUpperCase() + x.slice(1);
+    const k = x.toLowerCase().replace(/[^a-z]/g, "").slice(0, 60);
+    if (seen.has(k)) continue; seen.add(k);
+    out.push(x.length > 420 ? x.slice(0, 420).replace(/,[^,]*$/, ", and others.") : x);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+function sentences(text) {
+  return clean(text).replace(/\b(e\.g|i\.e|vs|approx|No|Fig|et al)\./gi, "$1\u2024")
+    .split(/(?<=[.;])\s+(?=[A-Z(])/).map(s => s.replace(/\u2024/g, "."));
+}
+
+// Sentences that report an endpoint with a number, best first.
+function keyResults(body, max) {
+  const out = [];
+  for (let s of sentences(body)) {
+    s = s.replace(/^.*?Figure \d+:.*?(?=\b(?:After|At|In|With)\s+(?:a\s+)?median|\b[A-Z]{3,}[A-Z0-9-]*\s+demonstrated)/, "").trim();
+    if (s.length < 30 || s.length > 600) continue;
+    if (/NCT\d|efficacy outcome measure|(?:major|main|primary) efficacy outcomes? (?:was|were)|outcome measures? (?:was|were)|primary endpoint was|Number \(%\)|Median in months|p-Value is compared|was a randomized|were randomized/i.test(s)) continue;
+    if (/Table \d+:|Abbreviations|Figure \d+:|\bN\s?=\s?\d+.*\bN\s?=\s?\d+/.test(s)) continue;
+    if ((s.match(/\d+(\.\d+)?/g) || []).length > 14) continue;
+    if (!ENDPOINT.test(s) || !/\d/.test(s)) continue;
+    if (/excluded|eligible|enrolled patients with|were required|inclusion|exclusion|stratified by|was assessed by|assessed every|tumor assessments|were performed/i.test(s)) continue;
+    let score = 0;
+    if (/overall survival|\bOS\b/i.test(s)) score += 4;
+    if (/hazard ratio|\bHR\b/i.test(s)) score += 3;
+    if (/median/i.test(s)) score += 2;
+    if (/statistically significant|improvement|reduc|demonstrated/i.test(s)) score += 2;
+    if (/response rate|\bORR\b|duration of response|HbA1c|\bA1C\b|MACE|body weight/i.test(s)) score += 2;
+    if (/\d+(\.\d+)?\s?(months|years|weeks|%)/i.test(s)) score += 1;
+    if (/subgroup|exploratory|post[- ]hoc|not (?:formally )?tested|descriptive/i.test(s)) score -= 6;
+    out.push({ s, score });
+  }
+  const seen = new Set();
+  return out.sort((a, b) => b.score - a.score).filter(o => { const k = o.s.slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, max).map(o => o.s);
+}
+
+// Plain-English notes for the numbers in a result sentence.
+function explainNumbers(s0) {
+  const notes = [], s = String(s0).replace(/\(?95%\s?CI\)?:?/gi, " ");
+  const hr = s.match(/(?:hazard ratio|\bHR\b)[^0-9]{0,30}(0\.\d{1,3}|1\.\d{1,3})/i);
+  if (hr) {
+    const v = parseFloat(hr[1]);
+    if (v < 1) notes.push(`A hazard ratio of ${hr[1]} means about ${Math.round((1 - v) * 100)}% lower risk of the measured event (for example death or the disease worsening) at any given time, compared with the other group.`);
+    else if (v > 1) notes.push(`A hazard ratio of ${hr[1]} means about ${Math.round((v - 1) * 100)}% higher risk of the measured event compared with the other group.`);
+  }
+  if (/median (?:overall survival|OS)/i.test(s) || /overall survival[^.]{0,40}median/i.test(s)) notes.push("Median survival is the point when half the people in that group were still alive.");
+  else if (/median (?:progression[- ]free|PFS)/i.test(s)) notes.push("Median progression-free survival is the point when half the people still had no worsening of their disease.");
+  if (/not reached|\bNR\b/.test(s)) notes.push("\"Not reached\" means more than half the people were still doing well when the data were counted, so the median couldn't be calculated yet. That is usually a good sign.");
+  if (/response rate|\bORR\b/i.test(s) && /\d+%/.test(s)) notes.push("Response rate is the share of people whose disease shrank by a set amount.");
+  return notes;
+}
+
+// Facts about who was in a study: median age, share 65+ and 75+.
+function ageFacts(body) {
+  const t = clean(body), out = [];
+  const med = [...t.matchAll(/median age(?: was| of)?[^0-9]{0,12}(\d{2})(?: years)?(?:\s*\((?:range[:,]?\s*)?(\d{1,2})\s*(?:to|-)\s*(\d{2,3})\))?/gi)];
+  for (const m of med.slice(0, 2)) out.push(`Median age ${m[1]}` + (m[2] ? ` (range ${m[2]} to ${m[3]})` : ""));
+  if (!med.length) {
+    const mean = t.match(/mean age(?: was| of)?[^0-9]{0,12}(\d{2})(?:\.\d)? years/i);
+    if (mean) out.push(`Average age ${mean[1]}`);
+  }
+  const older = n => new RegExp(`(\\d{1,2}(?:\\.\\d)?)%[^.;%]{0,25}(?:≥\\s?${n}|${n} years(?: of age)? (?:or|and) (?:older|over)|${n} or older|aged ${n}\\b)`, "i");
+  const p65 = t.match(older(65));
+  if (p65) out.push(`${p65[1]}% were 65 or older`);
+  const p75 = t.match(older(75));
+  if (p75) out.push(`${p75[1]}% were 75 or older`);
+  return [...new Set(out)];
+}
+
+const NOT_TRIALS = /^(ORR|PFS|OS|EFS|DFS|RFS|DMFS|IDFS|DOR|NSAI|MACE|UACR|FPG|BICR|IRC|RECIST|ECOG|NYHA|ITT|TPS|CPS|MSI|DMMR|TMB|CTCAE|NCCN|FDA|USA|ULN|HER|PD|CD|BRCA|EGFR|ALK|BMI|COVID|AIDS|HIV|NOTE|ONLY|TABLE|FIGURE|ARM|PART|COHORT|CYCLE|WEEK|DAY|GROUP|DRD|RD|VMP|DVD|VD|KD|DKD)$/i;
+function trialNames(body, brand) {
+  const t = clean(body), names = new Set();
+  const b = String(brand || "").toUpperCase().split(" ")[0];
+  const add = n => { const base = n.split(/[- ]/)[0]; if (!NOT_TRIALS.test(base) && base.toUpperCase() !== b && !NOT_TRIALS.test(n)) names.add(n); };
+  for (const m of t.matchAll(/\b([A-Z][A-Z0-9]{2,}-\d{1,4}[A-Z]?)\b/g)) add(m[1]);
+  for (const m of t.matchAll(/\b([A-Z]{4,}(?:\s\d{1,2})?)(?=\s*(?:\(NCT|trial\b|study\b|was a\b|is a\b|,? a randomized|\s?\(N\s?=))/g)) add(m[1]);
+  for (const m of t.matchAll(/\b(?:Study|Trial)\s+([A-Z0-9][A-Z0-9-]{2,})/g)) add(m[1]);
+  return [...names].slice(0, 5);
+}
+
+function tableNumbersIn(body) { return new Set([...clean(body).matchAll(/Tables?\s+(\d+)/gi)].map(m => m[1])); }
+
+// Brand name for a label when the FDA's tagged name is missing: leading words before the generic name repeats.
+function brandFromElements(el) {
+  const words = clean(el).split(" ");
+  const out = [];
+  for (let i = 0; i < Math.min(words.length, 6); i++) {
+    const w = words[i];
+    const later = words.slice(i + 1).join(" ");
+    if (out.length && later.includes(w.toUpperCase()) && w !== w.toUpperCase()) break;
+    if (out.length && later.toUpperCase().includes(w.toUpperCase() + " ") && w.toLowerCase() === w) break;
+    out.push(w);
+    if (i + 1 < words.length && later.toUpperCase().split(" ").filter(x => x === words[i + 1].toUpperCase()).length > 0 && out.length) {
+      const next = words[i + 1];
+      if (next.toUpperCase() !== next || next.length < 4) continue;
+    }
+  }
+  return out.join(" ");
+}
+
+const REPACKAGER = /A-S Medication|Henry Schein|Proficient Rx|Bryant Ranch|NuCare|RemedyRepack|Direct[_ ]?Rx|Quality Care|PD-Rx|Lake Erie|Preferred Pharmaceuticals|Cardinal Health|McKesson|Asclemed|Enovachem|H\.?J\.? Harkins|Northwind|Medsource|Aphena|St\.? Mary|Unit Dose Services|American Health Packaging|Physicians Total Care|Rebel Distributors|Golden State Medical|Denton Pharma|Safecor|Major Pharmaceuticals|Avera McKennan|Med-Health Pharma|NorthStar|Clinical Solutions Wholesale/i;
+function isRepackager(r) { return REPACKAGER.test(((r.openfda || {}).manufacturer_name || [""])[0]); }
+
+// Collapse label search results into one entry per product: the manufacturer's own newest label.
+function productsFrom(results, query) {
+  const q = query.toLowerCase();
+  const byName = new Map();
+  for (const r of results || []) {
+    const o = r.openfda || {};
+    const apps = o.application_number || [];
+    if (apps.length && !apps.some(a => /^(NDA|BLA)/.test(a))) continue;
+    const el = (r.spl_product_data_elements || [""])[0];
+    const name = clean((o.brand_name || [])[0] || brandFromElements(el)) || query;
+    const generic = clean((o.generic_name || [])[0] || "");
+    const key = name.toLowerCase();
+    const prev = byName.get(key);
+    const better = !prev
+      || (isRepackager(prev.label) && !isRepackager(r))
+      || (isRepackager(prev.label) === isRepackager(r) && (r.effective_time || "") > (prev.label.effective_time || ""));
+    if (better) byName.set(key, { name: prev && !isRepackager(r) && /[a-z]/.test(prev.name) && !/[a-z]/.test(name) ? prev.name : name, generic, label: r });
+  }
+  return [...byName.values()].sort((a, b) => {
+    const ea = a.name.toLowerCase() === q ? 0 : a.name.toLowerCase().startsWith(q) ? 1 : 2;
+    const eb = b.name.toLowerCase() === q ? 0 : b.name.toLowerCase().startsWith(q) ? 1 : 2;
+    return ea - eb || a.name.localeCompare(b.name);
+  });
+}
+
+// Strip the label's HTML table to plain cells, keeping structure only.
+function tableToRows(html) {
+  const out = { caption: "", rows: [] };
+  const cap = String(html).match(/<caption[^>]*>([\s\S]*?)<\/caption>/i);
+  if (cap) out.caption = clean(cap[1].replace(/<[^>]+>/g, " "));
+  for (const tr of String(html).matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...tr[1].matchAll(/<(td|th)([^>]*)>([\s\S]*?)<\/\1>/gi)].map(c => ({
+      head: c[1].toLowerCase() === "th", span: Math.min(12, parseInt((c[2].match(/colspan="?(\d+)/i) || [])[1] || "1", 10)),
+      text: clean(c[3].replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&#8805;|&ge;/g, "≥").replace(/&#8804;|&le;/g, "≤").replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCharCode(+d)).replace(/HbA\s1c/g, "HbA1c"))
+    }));
+    if (cells.some(c => c.text)) out.rows.push(cells);
+  }
+  if (!out.caption && out.rows.length && out.rows[0].length === 1) out.caption = out.rows.shift()[0].text;
+  return out;
+}
+// Headline rows from a results table: hazard ratios, medians, response rates, and changes from baseline.
+const METRIC_ROW = /hazard ratio|^median|change at week|difference from|treatment difference|response rate|\bORR\b|complete response|duration of response|change from baseline|mean change|HbA1c|A1C|body weight|% of patients|percentage of patients|proportion of patients|events? \(|deaths?/i;
+function keyTableRows(t, max) {
+  const out = [];
+  let section = "";
+  const head = headerRowRaw(t);
+  for (const r of t.rows) {
+    if (r === head) continue;
+    const first = r[0] ? r[0].text : "";
+    const hasNum = r.slice(1).some(c => /\d/.test(c.text));
+    if (!hasNum && first && (r.length === 1 || r.slice(1).every(c => !c.text))) {
+      if (!/^(Abbreviations|Note|\*|†|‡|[a-z]\s|\d+\s)/i.test(first) && first.length <= 90) section = first.replace(/\s[a-z]$/, "").slice(0, 70);
+      continue;
+    }
+    if (hasNum && METRIC_ROW.test(first) && !/p-?value|stratified|number at risk/i.test(first)) {
+      out.push({ section, label: first, values: r.slice(1).map(c => c.text).filter(Boolean) });
+      if (out.length >= max) break;
+    }
+  }
+  return out;
+}
+function headerRowRaw(t) {
+  return t.rows.find(r => r.length > 1 && r.every(c => !/^\d|\d%|\(\d|^N\s?=/.test(c.text)));
+}
+// Column names for the value cells, whether or not the header row has a blank first cell.
+function headerRow(t) {
+  const h = headerRowRaw(t);
+  if (!h) return [];
+  const dataRow = t.rows.find(r => r !== h && r.length > 1 && r.slice(1).some(c => /\d/.test(c.text)));
+  const nVals = dataRow ? dataRow.length - 1 : h.length;
+  return (h.length === nVals + 1 ? h.slice(1) : h).map(c => c.text);
+}
+// Match results tables to studies: by "Table N" captions, or by order of mention when tables lack captions.
+function assignTables(tables, csText) {
+  const order = [...new Set([...clean(csText).matchAll(/Tables?\s+(\d+)/gi)].map(m => +m[1]))].sort((a, b) => a - b);
+  let k = 0;
+  return tables.map(t => { const n = tableNumber(t); if (n) return { ...t, num: n }; const guess = order[k++]; return { ...t, num: guess != null ? String(guess) : null }; });
+}
+
+function tableNumber(t) { const m = (t.caption || "").match(/Table\s+(\d+)/i); return m ? m[1] : null; }
+function tableAsText(t) { return (t.caption ? t.caption + "\n" : "") + t.rows.map(r => r.map(c => c.text).join(" | ")).join("\n"); }
+
+function ageBand(age) {
+  if (age === null || isNaN(age)) return null;
+  if (age < 18) return "child";
+  if (age >= 65) return "older";
+  return "adult";
+}
+
+const AI_PROMPT = (drug, age) => `Please help me understand this prescription drug. I am not a medical professional.
+
+Below is text from the official FDA label for ${drug}. Using ONLY this label text, explain in plain, everyday language (about an 8th-grade reading level):
+
+1. What the drug is and, simply, how it works.
+2. What it is FDA-approved to treat.
+3. For each main study: who was in it, what the drug was compared with, and the main results (for example overall survival, progression-free survival, response rate, duration of response, or blood sugar change), with every number explained in simple terms. Say clearly when a result is about the disease shrinking rather than people living longer.
+4. What the label says about ${age ? "people around age " + age + " and " : ""}older adults.
+5. The most serious warnings and the most common side effects.
+6. Good questions to ask the doctor.
+
+Rules: Do not give personal medical advice, and do not say whether a specific person should or should not take this drug. If something is not in the label, say "the label does not say." Keep it clear and kind.
+
+----- FDA LABEL TEXT -----
+`;
+/* ---------- End pure helpers ---------- */
+
+const $ = id => document.getElementById(id);
+let current = null, products = [], reportText = "";
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function setStatus(m, err) { $("status").textContent = m || ""; $("status").className = "status" + (err ? " err" : ""); }
+function sec(label, key) { return clean((label[key] || []).join(" ")); }
+function titleCase(s) { return String(s || "").toLowerCase().replace(/(^|[\s\-\/(])([a-z])/g, (m, a, b) => a + b.toUpperCase()); }
+function fmtDate(d) { return d && d.length === 8 ? new Date(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6)).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : ""; }
+
+// Wrap glossary terms in a sentence so they show a definition on hover or tap.
+function annotate(s) {
+  let h = esc(s);
+  for (const [name, re, def] of GLOSSARY) {
+    const g = new RegExp(re.source, re.flags.includes("i") ? "gi" : "g");
+    let done = false;
+    h = h.replace(g, m => { if (done) return m; done = true; return `<span class="term" tabindex="0" data-tip="${esc(name + ": " + def)}">${m}</span>`; });
+  }
+  return h;
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (r.status === 404) return null;
+  if (r.status === 429) throw new Error("The FDA service is busy right now. Please wait a minute and try again.");
+  if (!r.ok) throw new Error("The FDA service returned an error (" + r.status + ").");
+  return r.json();
+}
+
+async function search(q) {
+  const name = q.replace(/["\\]/g, "").trim();
+  const enc = s => encodeURIComponent(s);
+  const [a, b] = await Promise.all([
+    getJSON(`https://api.fda.gov/drug/label.json?search=${enc(`openfda.brand_name:"${name}" OR openfda.generic_name:"${name}"`)}&limit=100`),
+    getJSON(`https://api.fda.gov/drug/label.json?search=${enc(`spl_product_data_elements:"${name}"`)}&limit=25`)
+  ]);
+  const seen = new Set();
+  const all = [...((a && a.results) || []), ...((b && b.results) || [])].filter(r => !seen.has(r.set_id) && seen.add(r.set_id))
+    .filter(r => r.indications_and_usage);
+  return productsFrom(all, name);
+}
+
+async function firstApproval(generic) {
+  const g = generic.toLowerCase().replace(SALT_TAIL, "").split(/[ ,]/)[0];
+  if (!g || g.length < 4) return null;
+  const r = await getJSON(`https://api.fda.gov/drug/drugsfda.json?search=${encodeURIComponent(`products.active_ingredients.name:"${g}"`)}&limit=100`).catch(() => null);
+  let best = null;
+  for (const app of (r && r.results) || []) {
+    if (/^ANDA/.test(app.application_number)) continue;
+    const ings = (app.products || []).flatMap(p => (p.active_ingredients || []).map(i => i.name.toLowerCase()));
+    if (!ings.some(i => i === g || i.startsWith(g + " ") || i.startsWith(g + "-"))) continue;
+    for (const s of app.submissions || []) {
+      if (s.submission_type === "ORIG" && s.submission_status === "AP" && s.submission_status_date && (!best || s.submission_status_date < best.date)) best = { date: s.submission_status_date, ingredient: g };
+    }
+  }
+  return best;
+}
+
+async function run(q) {
+  q = (q || "").trim();
+  if (!q) { setStatus("Type a drug name first."); return; }
+  $("go").disabled = true; $("out").hidden = true;
+  setStatus("Looking up the FDA label...");
+  try {
+    products = await search(q);
+    if (!products.length) { setStatus(`No FDA label found for "${q}". Check the spelling, or try the generic name (printed in small letters under the brand name in ads).`, true); return; }
+    await show(0);
+    setStatus("");
+  } catch (e) {
+    setStatus(e.message || "Couldn't reach the FDA service. Please try again.", true);
+  } finally { $("go").disabled = false; }
+}
+
+async function show(i) {
+  const p = products[i], L = p.label, o = L.openfda || {};
+  const generic = p.generic || clean(((L.spl_product_data_elements || [""])[0]).split(" ").slice(p.name.split(" ").length, p.name.split(" ").length + 1).join(" "));
+  const appr = await firstApproval(generic || p.name);
+  const age = $("age").value === "" ? null : Number($("age").value);
+  current = { p, L, generic, appr, age };
+
+  $("out").hidden = false;
+  $("versions").innerHTML = products.length > 1
+    ? `<span class="hint">Versions found:</span>` + products.slice(0, 8).map((x, k) => `<button class="small ${k === i ? "on" : ""}" data-k="${k}">${esc(titleCase(x.name))}</button>`).join("")
+    : "";
+  $("versions").querySelectorAll("button").forEach(b => b.onclick = () => show(+b.dataset.k));
+
+  $("dName").textContent = titleCase(p.name);
+  $("dGeneric").textContent = generic ? "Generic name: " + generic.toLowerCase() : "";
+  const cls = (o.pharm_class_epc || [])[0];
+  const facts = [
+    cls ? ["Type of drug", cls.replace(/\s*\[EPC\]/, "")] : null,
+    appr ? [`First FDA approval (${appr.ingredient})`, fmtDate(appr.date)] : null,
+    ["This label last updated", fmtDate(L.effective_time)],
+    o.manufacturer_name ? ["Made by", o.manufacturer_name[0]] : null
+  ].filter(Boolean);
+  const setid = L.set_id;
+  $("facts").innerHTML = facts.map(([k, v]) => `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join("") +
+    `<div class="fact"><div class="k">Full official label</div><div class="v"><a href="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=${esc(setid)}" target="_blank" rel="noopener">Open on DailyMed</a></div></div>`;
+
+  const boxed = sec(L, "boxed_warning");
+  $("boxed").innerHTML = boxed ? `<div class="callout bad"><strong>Boxed warning.</strong> This is the FDA's most serious type of warning. ${esc(boxed.replace(/^WARNING:?\s*/i, "").slice(0, 700))}${boxed.length > 700 ? "..." : ""}</div>` : "";
+
+  // Indications
+  let ind = splitNumbered(sec(L, "indications_and_usage"), "1").filter(x => x.body.length > 10);
+  if (ind.some(x => x.num)) ind = ind.filter(x => x.num);
+  $("indications").innerHTML = ind.map(x => {
+    const items = indicationItems(x.body);
+    const shown = items.slice(0, 8), more = items.slice(8);
+    return `<div class="card">${x.title ? `<h3>${esc(x.title)}</h3>` : ""}<ul class="clean">${shown.map(i => `<li>${annotate(i)}</li>`).join("")}</ul>${more.length ? `<details><summary>${more.length} more</summary><ul class="clean">${more.map(i => `<li>${annotate(i)}</li>`).join("")}</ul></details>` : ""}</div>`;
+  }).join("");
+
+  // Studies with their tables
+  const tables = assignTables((L.clinical_studies_table || []).map(tableToRows), sec(L, "clinical_studies"));
+  const studies = splitNumbered(sec(L, "clinical_studies"), "14").filter(x => x.body.length > 80);
+  current.studies = studies.map(s => {
+    const nums = tableNumbersIn(s.body);
+    return { ...s, results: keyResults(s.body, 5), ages: ageFacts(s.body), trials: trialNames(s.body, p.name), tables: tables.filter(t => nums.has(t.num)) };
+  });
+  $("studyFilterRow").hidden = current.studies.length < 3;
+  $("studyFilter").value = "";
+  renderStudies();
+
+  renderAge();
+
+  // Side effects
+  const ar = sec(L, "adverse_reactions");
+  const common = commonSideEffects(ar);
+  $("sideEffects").innerHTML = `<div class="card">${common.length ? "<ul class='clean'>" + common.map(s => `<li>${annotate(s)}</li>`).join("") + "</ul>" : `<p>${esc(ar.slice(0, 600))}...</p>`}
+    <details><summary>All warnings and precautions</summary><div class="full">${esc(sec(L, "warnings_and_cautions") || "Not listed in this label.")}</div></details></div>`;
+
+  buildGlossary();
+  buildReport();
+  window.scrollTo({ top: $("out").offsetTop - 10, behavior: "smooth" });
+}
+
+function renderStudies() {
+  const f = $("studyFilter").value.trim().toLowerCase();
+  const list = current.studies.filter(s => !f || (s.title + " " + s.body).toLowerCase().includes(f));
+  $("studies").innerHTML = list.length ? list.map(s => `
+    <div class="card study">
+      <h3><span>${esc(s.title || "Main study")}</span></h3>
+      <div>${s.trials.map(t => `<span class="tag">${esc(t)}</span>`).join("")}${s.ages.map(a => `<span class="tag">${esc(a)}</span>`).join("")}</div>
+      ${s.results.length ? s.results.map(r => {
+        const notes = explainNumbers(r);
+        const sub = /subgroup|exploratory|post[- ]hoc/i.test(r) ? `<span class="tag">Smaller sub-analysis, not the main result</span> ` : "";
+        return `<div class="result">${sub}${annotate(r)}${notes.length ? `<div class="plain">${notes.map(esc).join(" ")}</div>` : ""}</div>`;
+      }).join("") : `<p class="hint">No headline numbers were found automatically for this study. Open the full text or tables below.</p>`}
+      ${tableHighlights(s)}
+      ${s.tables.length ? `<details><summary>Results tables (${s.tables.length})</summary>${s.tables.map(renderTable).join("")}</details>` : ""}
+      <details><summary>Full text of this section</summary><div class="full">${esc(s.body)}</div></details>
+    </div>`).join("") : `<div class="card hint">${current.studies.length ? "No studies match that filter." : "This label has no clinical studies section."}</div>`;
+  buildReport();
+}
+
+function tableHighlights(s) {
+  const items = [];
+  for (const t of s.tables.slice(0, 4)) {
+    const heads = headerRow(t);
+    for (const row of keyTableRows(t, 3)) items.push({ t, heads, row });
+    if (items.length >= 6) break;
+  }
+  if (!items.length) return "";
+  return `<div class="result"><strong>From the results tables</strong><ul class="clean">` + items.map(({ t, heads, row }) => {
+    const vals = row.values.map((v, i) => (heads[i] && heads.length === row.values.length ? `${heads[i]}: ` : "") + v).join("; ");
+    const line = `${row.section && !row.label.toLowerCase().includes(row.section.toLowerCase()) ? row.section + ", " : ""}${row.label}: ${vals}`;
+    const notes = explainNumbers(row.label + " " + row.values.join(" "));
+    return `<li>${annotate(line)} <span class="hint">(${esc((t.caption.split(/[:–-]/)[0] || "").trim() || "Table " + (t.num || ""))})</span>${notes.length ? `<div class="plain">${notes.map(esc).join(" ")}</div>` : ""}</li>`;
+  }).join("") + `</ul></div>`;
+}
+
+function renderTable(t) {
+  return `<div class="tablewrap"><table>${t.caption ? `<caption>${esc(t.caption)}</caption>` : ""}${t.rows.map(r => `<tr>${r.map(c => `<${c.head ? "th" : "td"} colspan="${c.span}">${esc(c.text)}</${c.head ? "th" : "td"}>`).join("")}</tr>`).join("")}</table></div>`;
+}
+
+function renderAge() {
+  const { L, age } = current;
+  const band = ageBand(age);
+  const ger = sec(L, "geriatric_use").replace(/^8\.5\s*Geriatric Use\s*/i, "");
+  const ped = sec(L, "pediatric_use").replace(/^8\.4\s*Pediatric Use\s*/i, "");
+  const studyAges = current.studies.filter(s => s.ages.length).map(s => `<li><strong>${esc(s.title || "Study")}:</strong> ${esc(s.ages.join("; "))}</li>`).join("");
+  $("ageTitle").textContent = band ? `What the label says for someone aged ${age}` : "What the label says about age";
+  let html = `<div class="callout info">The label can't say whether this drug will help one particular person. It reports what happened to groups of people in studies. Here is what it says about age, to bring to the doctor.</div>`;
+  if (band === "child") {
+    html += `<div class="card"><h3>Children and teens (from the label)</h3><p>${annotate(ped || "The label does not include a section on children.")}</p></div>`;
+  }
+  if (band === "older" || band === null) {
+    html += `<div class="card"><h3>Older adults (from the label)</h3><p>${ger ? annotate(ger) : "The label does not include a section on older adults."}</p>
+      ${band === "older" && age >= 75 ? `<p class="hint">Studies usually include fewer people aged 75 and over, so results for this age group are less certain. Check the 75-and-older numbers above if the label gives them.</p>` : ""}</div>`;
+  }
+  if (band === "adult") {
+    html += `<div class="card"><h3>Adults under 65</h3><p>Most main studies enroll adults across a wide age range. The label's specific age notes are about older adults and children:</p>
+      <details><summary>Older adults section</summary><div class="full">${esc(ger || "Not included in this label.")}</div></details></div>`;
+  }
+  if (studyAges) html += `<div class="card"><h3>Ages of people in the main studies</h3><ul class="clean">${studyAges}</ul><p class="hint">Pulled automatically from the study descriptions. If someone is outside these ages, ask the doctor whether the results apply.</p></div>`;
+  html += `<div class="card"><h3>Questions to ask the doctor</h3><ul class="clean">
+    <li>Which of the approved uses applies to this situation, and which study is closest to it?</li>
+    <li>In that study, how much longer did people live, or how much better did they do, than with the other treatment?</li>
+    ${band === "older" ? "<li>Were people of this age and health well represented in the study, and did they do as well as younger people?</li><li>Are side effects more likely or more serious at this age, and how would they be watched for?</li>" : ""}
+    ${band === "child" ? "<li>Has this drug been studied and approved for children of this age?</li>" : ""}
+    <li>What are the other options, including the standard treatment, and how do they compare?</li>
+    <li>Which side effects should prompt an urgent call?</li>
+    <li>What does it cost, and is it covered by insurance?</li></ul></div>`;
+  $("agePanel").innerHTML = html;
+}
+
+function buildGlossary() {
+  const text = [sec(current.L, "indications_and_usage"), ...current.studies.map(s => s.results.join(" "))].join(" ");
+  const used = GLOSSARY.filter(([, re]) => re.test(text));
+  $("glossary").innerHTML = (used.length ? used : GLOSSARY.slice(0, 6)).map(([n, , d]) => `<dt>${esc(n)}</dt><dd>${esc(d)}</dd>`).join("");
+}
+
+const REPORT_LIMIT = 90000;
+function buildReport() {
+  if (!current) return;
+  const { p, L, age } = current;
+  const f = $("studyFilter").value.trim().toLowerCase();
+  const studies = current.studies.filter(s => !f || (s.title + " " + s.body).toLowerCase().includes(f));
+  const parts = [
+    ["DRUG", `${titleCase(p.name)}${current.generic ? " (" + current.generic.toLowerCase() + ")" : ""}. Label last updated ${fmtDate(L.effective_time)}.`],
+    ["BOXED WARNING", sec(L, "boxed_warning")],
+    ["APPROVED USES (INDICATIONS)", sec(L, "indications_and_usage")],
+    ["HOW IT WORKS", sec(L, "mechanism_of_action")],
+    ["MAIN STUDIES" + (f ? ` (only studies mentioning "${f}")` : ""), studies.map(s => `${s.num} ${s.title}\n${s.body}\n${s.tables.map(tableAsText).join("\n\n")}`).join("\n\n")],
+    ["OLDER ADULTS", sec(L, "geriatric_use")],
+    ["CHILDREN", sec(L, "pediatric_use")],
+    ["WARNINGS AND PRECAUTIONS", sec(L, "warnings_and_cautions").slice(0, 8000)],
+    ["SIDE EFFECTS", sec(L, "adverse_reactions").slice(0, 6000)]
+  ].filter(([, v]) => v);
+  let body = parts.map(([k, v]) => `## ${k}\n${v}`).join("\n\n");
+  let note = "";
+  if (body.length > REPORT_LIMIT) {
+    body = body.slice(0, REPORT_LIMIT) + "\n\n[Report shortened to fit AI limits. Use the study filter above to focus on one condition.]";
+    note = f ? `Even focused on "${f}", this label is very long, so the report was trimmed to about 90 thousand characters. Most AI assistants can read a file this size.`
+      : "This label is very long, so the report was trimmed. Type a condition in the study filter (for example \"lung\") to focus the report on those studies.";
+  }
+  reportText = AI_PROMPT(titleCase(p.name), age) + body + `\n\nSource: FDA drug label via openFDA, set ID ${L.set_id}. Generated by Drug Label Explainer.`;
+  $("reportNote").textContent = note || `Report size: about ${Math.round(reportText.length / 1000)} thousand characters.` + (f ? ` Focused on studies mentioning "${f}".` : "");
+}
+
+async function explainWithAI() {
+  const key = $("key").value.trim();
+  if (!key) { $("aiOut").hidden = false; $("aiOut").textContent = "Enter your Claude API key first."; return; }
+  $("ai").disabled = true; $("aiOut").hidden = false; $("aiOut").textContent = "Writing a plain-English summary...";
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: $("model").value.trim() || "claude-sonnet-5-5", max_tokens: 2500, messages: [{ role: "user", content: reportText }] })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || ("HTTP " + r.status));
+    $("aiOut").textContent = (j.content || []).filter(c => c.type === "text").map(c => c.text).join("\n") + "\n\nAI-generated from the FDA label. It can make mistakes; check important points against the label and with a doctor.";
+  } catch (e) {
+    $("aiOut").textContent = "The AI request failed: " + e.message;
+  } finally { $("ai").disabled = false; }
+}
+
+// Tooltips for glossary terms (hover on desktop, tap on phones)
+function showTip(el, x, y) {
+  const tip = $("tip");
+  tip.textContent = el.getAttribute("data-tip");
+  tip.style.display = "block";
+  tip.style.left = Math.max(8, Math.min(x + 12, window.innerWidth - tip.offsetWidth - 8)) + "px";
+  tip.style.top = (y + 16) + "px";
+}
+document.addEventListener("mousemove", e => { const el = e.target.closest && e.target.closest("[data-tip]"); if (el) showTip(el, e.clientX, e.clientY); else $("tip").style.display = "none"; });
+document.addEventListener("click", e => { const el = e.target.closest && e.target.closest("[data-tip]"); if (el) { const b = el.getBoundingClientRect(); showTip(el, b.left, b.bottom - 10); } else $("tip").style.display = "none"; });
+
+$("go").onclick = () => run($("q").value);
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") run($("q").value); });
+$("age").addEventListener("keydown", e => { if (e.key === "Enter") run($("q").value); });
+$("age").addEventListener("change", () => { if (current) { current.age = $("age").value === "" ? null : Number($("age").value); renderAge(); buildReport(); } });
+document.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("q").value = b.textContent; run(b.textContent); });
+$("studyFilter").addEventListener("input", renderStudies);
+$("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([reportText], { type: "text/plain" }));
+  a.download = `${current.p.name.replace(/[^A-Za-z0-9]+/g, "-")}-label-report.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(reportText); $("reportNote").textContent = "Copied. Paste it into your AI assistant."; }
+  catch (e) { $("reportNote").textContent = "Copy didn't work here. Use Download instead."; }
+};
+$("ai").onclick = explainWithAI;
+window.addEventListener("pagehide", () => { $("key").value = ""; });
+</script>
+</body>
+</html>
