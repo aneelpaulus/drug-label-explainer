@@ -77,6 +77,13 @@
   .aiout { white-space: pre-wrap; }
   footer { margin-top: 40px; color: var(--muted); font-size: 0.84rem; }
   a { color: var(--accent); }
+  .kit { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.85rem; margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .kit a { color: var(--muted); text-decoration: none; }
+  .kit a:hover { color: var(--accent); text-decoration: underline; }
+  .kit a.here { color: var(--text); font-weight: 600; }
+  .kit a.home { color: var(--accent); font-weight: 700; }
+  .xlinks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.88rem; margin-top: 6px; }
+  .xlinks a { color: var(--accent); }
 </style>
 <style>
 /* Medical AI Toolkit shared look (Nov 2026). Loaded after each page's own styles. */
@@ -179,6 +186,7 @@ footer details p{margin:8px 0 0;max-width:46em}
       <p class="drugname" id="dName"></p>
       <div class="hint" id="dGeneric"></div>
       <div class="facts" id="facts"></div>
+      <div class="xlinks" id="dLinks"></div>
     </div>
     <div id="boxed"></div>
 
@@ -573,6 +581,33 @@ async function firstApproval(generic) {
   return best;
 }
 
+// Keep the search in the web address so a summary can be shared, and other tools can link here.
+const KIT = "https://aneelpaulus.github.io/";
+function saveToAddress(q) {
+  const p = new URLSearchParams({ drug: q });
+  if ($("age").value !== "") p.set("age", $("age").value);
+  try { history.replaceState(null, "", "?" + p.toString()); } catch (e) {}
+}
+// Links to the other tools: reported side effects (FDA reports) and other drugs aimed at the same target.
+let linkToken = 0;
+async function showToolLinks(name) {
+  const token = ++linkToken;
+  const g = String(name).toLowerCase().replace(SALT_TAIL, "").split(/[ ,]/)[0];
+  const links = [`<a href="${KIT}adverse-event-explorer/?drugs=${encodeURIComponent(g)}">Side effects people have reported to the FDA</a>`];
+  $("dLinks").innerHTML = links.join("");
+  try {
+    const gql = (query, variables) => fetch("https://api.platform.opentargets.org/api/v4/graphql", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) }).then(r => r.json());
+    const s = await gql(`query($q:String!){ search(queryString:$q, entityNames:["drug"], page:{index:0,size:1}){ hits { id name } } }`, { q: g });
+    const hit = (((s || {}).data || {}).search || {}).hits || [];
+    if (!hit.length || hit[0].name.toLowerCase() !== g) return;
+    const d = await gql(`query($id:String!){ drug(chemblId:$id){ mechanismsOfAction { rows { targets { approvedSymbol } } } } }`, { id: hit[0].id });
+    const targets = [...new Set(((((d || {}).data || {}).drug || {}).mechanismsOfAction || {}).rows.flatMap(r => r.targets.map(t => t.approvedSymbol)))].slice(0, 3);
+    if (token !== linkToken || !targets.length) return;
+    targets.forEach(t => links.push(`<a href="${KIT}drug-target-tracker/?target=${encodeURIComponent(t)}">Other drugs aimed at ${esc(t)}</a>`));
+    $("dLinks").innerHTML = links.join("");
+  } catch (e) { /* the target link is optional */ }
+}
+
 async function run(q) {
   q = (q || "").trim();
   if (!q) { setStatus("Type a drug name first."); return; }
@@ -582,6 +617,7 @@ async function run(q) {
     products = await search(q);
     if (!products.length) { setStatus(`No FDA label found for "${q}". Check the spelling, or try the generic name (printed in small letters under the brand name in ads).`, true); return; }
     await show(0);
+    saveToAddress(q);
     setStatus("");
   } catch (e) {
     setStatus(e.message || "Couldn't reach the FDA service. Please try again.", true);
@@ -603,6 +639,7 @@ async function show(i) {
 
   $("dName").textContent = titleCase(p.name);
   $("dGeneric").textContent = generic ? "Generic name: " + generic.toLowerCase() : "";
+  showToolLinks(generic || p.name);
   const cls = (o.pharm_class_epc || [])[0];
   const facts = [
     cls ? ["Type of drug", cls.replace(/\s*\[EPC\]/, "")] : null,
@@ -802,7 +839,14 @@ $("copy").onclick = async () => {
 };
 $("ai").onclick = explainWithAI;
 window.addEventListener("pagehide", () => { $("key").value = ""; });
-(function(){const P=new URLSearchParams(location.search);const d=P.get("drug")||P.get("q");if(P.get("age"))$("age").value=P.get("age");if(d){$("q").value=d;run(d);}})();
+// Open with a search already filled in, e.g. ?drug=Keytruda&age=72
+(() => {
+  const q = new URLSearchParams(location.search);
+  const d = (q.get("drug") || "").trim().slice(0, 80);
+  const a = q.get("age");
+  if (a && /^\d{1,3}$/.test(a) && +a <= 120) $("age").value = a;
+  if (d) { $("q").value = d; run(d); }
+})();
 </script>
 </body>
 </html>
